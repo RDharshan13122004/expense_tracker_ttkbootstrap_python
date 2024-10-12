@@ -189,7 +189,7 @@ exp_add_button.pack()
 test1 = tb.Label(DB_Scrolled_frame,bootstyle="warning")
 test1.pack()
 '''
-#intk = DB_work()
+intk = DB_work()
 
 #submit buttons
 
