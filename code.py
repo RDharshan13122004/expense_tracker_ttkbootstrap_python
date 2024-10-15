@@ -92,12 +92,13 @@ class DB_work:
 
         #creating expenditure category combobox
 
-        items = set()
+        cls.items = set()
         for i in items_col:
-            items.add(i[0])
+            val = i[0].replace("_"," ").strip()
+            cls.items.add(val)
 
         # Add 2nd entry in the new row frame, on the same line
-        category_combobox = tb.Combobox(new_set_frame,bootstyle="success",values=sorted(list(items)))
+        category_combobox = tb.Combobox(new_set_frame,bootstyle="success",values=sorted(list(cls.items)))
         category_combobox.pack(side="left",pady=10,padx=5)
 
         category_combobox.current(0)
@@ -105,6 +106,9 @@ class DB_work:
         # Save references for later use
         cls.entries.append(Exp_amount_entry)
         cls.combos.append(category_combobox)
+
+        conn.commit()
+        conn.close()
 
 
     @classmethod
@@ -118,12 +122,6 @@ class DB_work:
         
         if not ck_data_presented:
             query.execute("insert into DATA (entry_date,salary) values(?,?)",(Date_Entry.entry.get(),salary_Entry.get()))
-        '''
-        elif ck_data_presented:
-            query.execute("update DATA set ")
-        else:
-            pass
-        '''
 
         # Loop through the dynamically added entries and combo boxes
         for i in range(len(cls.entries)):
@@ -132,25 +130,55 @@ class DB_work:
 
             print(amount)
             print(category)
+            if category not in cls.items:
+                DB_work.category_pop(category)
 
         conn.commit()
         conn.close()
 
+    @classmethod
+    def category_pop(cls,caty):
+        
+        cls.new_category_pop = tb.Toplevel(title="new category insert",size=(300,300))
+
+        the_category = caty
+        
+        new_category_entry = tb.Entry(cls.new_category_pop)
+        new_category_entry.pack(pady=20)
+        new_category_entry.insert(0,the_category)
+
+        inc_or_exp = StringVar()
+
+        income_radio_btn = tb.Radiobutton(cls.new_category_pop,variable=inc_or_exp,value="income",bootstyle = "success",text="income")
+        income_radio_btn.pack(pady=20)
+
+        expense_radio_btn = tb.Radiobutton(cls.new_category_pop,variable=inc_or_exp,value="expense",bootstyle = "danger",text="expense")
+        expense_radio_btn.pack(pady=20)
+
+        cp_submit = tb.Button(cls.new_category_pop,bootstyle="success",text="ADD",command=lambda: DB_work.alt_tables(the_category,inc_or_exp.get()))
+        cp_submit.pack(pady=20)
+
+    @classmethod 
+    def alt_tables(cls,caty,value):
+
+        caty_item = caty.replace(" ","_").strip().lower()
+        
+        conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+        query = conn.cursor()
+
+        query.execute("insert into Income_expenditure values (?,?)",(caty_item,value))
+
+        query.execute(f"ALTER TABLE DATA ADD COLUMN {caty_item} REAL DEFAULT NULL")
+
+        conn.commit()
+        conn.close()
+        
+        cls.new_category_pop.destroy()
 
 #functions
 
 def select_theme(x):
     root.style.theme_use(x)
-
-def ck_combo_ex():
-    '''
-    if category_combobox.get() in items:
-        print("yess")
-    else:
-        print("no")
-    '''
-    
-    #test1.config(text=f"{Date_Entry.entry.get()}")
 
 def upload_csv():
     CSV_frame.filename = filedialog.askopenfilename(initialdir="C:/users/",title="CSV files",filetypes=[("csv files","*csv")])
