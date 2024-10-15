@@ -4,11 +4,14 @@ from tkinter import filedialog
 #from tkinter import font
 import ttkbootstrap as tb
 from ttkbootstrap.scrolled import ScrolledFrame
+from ttkbootstrap.toast import ToastNotification
 import sqlite3
 import csv
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime
+from datetime import datetime
 
 root = tb.Window(title="Expense Tracker",
                  themename="superhero",
@@ -19,46 +22,119 @@ root = tb.Window(title="Expense Tracker",
 
 class DB_work:
 
+    entries = [] #stores all amount entries 
+    combos = [] #store all combo boxes
+
     def __init__(self):
-        conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
-        query = conn.cursor()
+        try:
+            '''
+            # Get the path to the user's Documents folder
+            document_path = os.path.join(os.path.expanduser("~"),"Documents")
 
-        query.execute("""create table IF NOT EXISTS DATA(
-                      entry_date Date PRIMARY KEY,
-                      addional_income REAL,
-                      travel REAL,
-                      food REAL,
-                      regular_expense REAL
-                      )""")
+            # Specify the database location in the Documents folder
+            db_path = os.path.join(document_path,"exptracker.db")
+            conn = sqlite3.connect(db_path)
+            '''
+            #connecting DB
+            conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+            query = conn.cursor()
+
+            #Create tables if they don't exist
+            query.execute("""create table IF NOT EXISTS DATA(
+                        entry_date Date PRIMARY KEY,
+                        salary REAL,
+                        addional_income REAL DEFAULT NULL,
+                        travel REAL DEFAULT NULL,
+                        food REAL DEFAULT NULL,
+                        regular_expense REAL DEFAULT NULL
+                        )""")
+            
+            query.execute("""create table IF NOT EXISTS Income_expenditure(
+                        ITEMs TEXT PRIMARY KEY,
+                        Inc_exp TEXT
+                        )""")
+            conn.commit()
+
+        except sqlite3.Error as e:
+
+            toast = ToastNotification(title="Expense tracker warning message ⚠️",
+                                      message=f"An error occurred while working with the database: {e}",
+                                      duration=3000,
+                                      bootstyle="danger",
+                                      alert=True,
+                                      ) 
+            toast.show_toast()
+
+        finally:
+            # Ensure the connection is closed, even if an error occur
+            if conn:
+                conn.close()
+
         
-        query.execute("""create table IF NOT EXISTS Income_expenditure(
-                      ITEMs TEXT PRIMARY KEY,
-                      Inc_exp TEXT
-                      )""")
-        conn.commit()
-
-        conn.close()
 
     @classmethod
     def new_section_of_label(cls):
+        
+        #connecting DB
+        conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+        query = conn.cursor()
+
+        query.execute("select ITEMs from Income_expenditure")
+        items_col = query.fetchall()
 
         # Create a new frame inside the same main frame to hold the new row
         new_set_frame = tb.Frame(main_ex_frame)
         new_set_frame.pack(fill="x", pady=5)
         
         # Add 1st entry in the new row frame
-        Exp_amount_entry2 = tb.Entry(new_set_frame,bootstyle="success")
-        Exp_amount_entry2.pack(pady=10,side="left",padx=5)
+        Exp_amount_entry = tb.Entry(new_set_frame,bootstyle="success")
+        Exp_amount_entry.pack(pady=10,side="left",padx=5)
 
         #creating expenditure category combobox
 
-        items = ["addional income","travel","food","regular expense"]
+        items = set()
+        for i in items_col:
+            items.add(i[0])
 
         # Add 2nd entry in the new row frame, on the same line
-        category_combobox2 = tb.Combobox(new_set_frame,bootstyle="success",values=items)
-        category_combobox2.pack(side="left",pady=10,padx=5)
+        category_combobox = tb.Combobox(new_set_frame,bootstyle="success",values=sorted(list(items)))
+        category_combobox.pack(side="left",pady=10,padx=5)
 
-        category_combobox2.current(0)
+        category_combobox.current(0)
+
+        # Save references for later use
+        cls.entries.append(Exp_amount_entry)
+        cls.combos.append(category_combobox)
+
+
+    @classmethod
+    def submit(cls):
+        conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+        query =  conn.cursor()
+
+        query.execute("select * from DATA where entry_date = ?",(Date_Entry.entry.get(),))
+        ck_data_presented = query.fetchone()
+
+        
+        if not ck_data_presented:
+            query.execute("insert into DATA (entry_date,salary) values(?,?)",(Date_Entry.entry.get(),salary_Entry.get()))
+        '''
+        elif ck_data_presented:
+            query.execute("update DATA set ")
+        else:
+            pass
+        '''
+
+        # Loop through the dynamically added entries and combo boxes
+        for i in range(len(cls.entries)):
+            amount = cls.entries[i].get()
+            category = cls.combos[i].get()
+
+            print(amount)
+            print(category)
+
+        conn.commit()
+        conn.close()
 
 
 #functions
@@ -85,7 +161,26 @@ def upload_csv():
             reader = csv.reader(csvfile)
             for row in reader:
                 print(row)  # Example: Print each row in the CSV file
+
+# Function to enable/disable salary entry based on the selected date
+def check_date_for_salary_entry():
+    conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+    query = conn.cursor()
+    query.execute("select salary from DATA where =")
+    selected_date = Date_Entry.entry.get()  # Get the selected date from the DateEntry widget
     
+    # Convert the selected date to a datetime object
+    selected_date_obj = datetime.strptime(selected_date, "%d-%m-%Y")
+    
+    # Check if the day of the selected date is the 1st
+    if selected_date_obj.day == 1:
+        salary_Entry.config(state="normal")  # Enable the salary entry
+    else:
+        salary_Entry.insert(0,"50000")
+        salary_Entry.config(state="disabled")  # Disable the salary entry
+
+    # Recheck the date after a short interval (500 milliseconds)
+    root.after(500, check_date_for_salary_entry)
 
 #GUI Title
 
@@ -137,6 +232,7 @@ XL_frame = tb.Frame(note_book)
 DB_Scrolled_frame = ScrolledFrame(DB_frame)
 DB_Scrolled_frame.pack(fill=BOTH,expand=True)
 
+intk = DB_work()
 
 #defualt labels and entry
 
@@ -149,8 +245,11 @@ Date_Entry.pack()
 Salary_label = tb.Label(DB_Scrolled_frame,text="Salary:",font=('Helvertica',18))
 Salary_label.pack(pady=10)
 
+
 salary_Entry = tb.Entry(DB_Scrolled_frame)
 salary_Entry.pack(pady=10,ipadx=16)
+
+check_date_for_salary_entry()
 
 #income and expenditure labels,Entry,combobutton
 
@@ -166,19 +265,7 @@ main_ex_frame.pack(pady=20)
 set_frame = tb.Frame(main_ex_frame)
 set_frame.pack(fill="x", pady=5)
 
-#placing a amount entry with  category menubutton
-
-Exp_amount_entry = tb.Entry(set_frame,bootstyle="success")
-Exp_amount_entry.pack(pady=10,side="left",padx=5)
-
-#creating expenditure category combobox
-
-items = ["addional income","travel","food","regular expense"]
-
-category_combobox = tb.Combobox(set_frame,bootstyle="success",values=items)
-category_combobox.pack(side="left",pady=10,padx=5)
-
-category_combobox.current(0)
+DB_work.new_section_of_label()
 
 #add button to insert multiple income and expenditure labels,Entry,combobox
 
@@ -189,11 +276,10 @@ exp_add_button.pack()
 test1 = tb.Label(DB_Scrolled_frame,bootstyle="warning")
 test1.pack()
 '''
-intk = DB_work()
 
 #submit buttons
 
-submit_button = tb.Button(DB_Scrolled_frame,text="Submit",bootstyle="success outline",command=ck_combo_ex)
+submit_button = tb.Button(DB_Scrolled_frame,text="Submit",bootstyle="success outline",command=DB_work.submit)
 submit_button.pack(pady=20)
 
 #******************************************************************************************************************************#
