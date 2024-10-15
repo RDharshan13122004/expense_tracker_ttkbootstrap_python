@@ -162,26 +162,6 @@ def upload_csv():
             for row in reader:
                 print(row)  # Example: Print each row in the CSV file
 
-# Function to enable/disable salary entry based on the selected date
-def check_date_for_salary_entry():
-    conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
-    query = conn.cursor()
-    query.execute("select salary from DATA where =")
-    selected_date = Date_Entry.entry.get()  # Get the selected date from the DateEntry widget
-    
-    # Convert the selected date to a datetime object
-    selected_date_obj = datetime.strptime(selected_date, "%d-%m-%Y")
-    
-    # Check if the day of the selected date is the 1st
-    if selected_date_obj.day == 1:
-        salary_Entry.config(state="normal")  # Enable the salary entry
-    else:
-        salary_Entry.insert(0,"50000")
-        salary_Entry.config(state="disabled")  # Disable the salary entry
-
-    # Recheck the date after a short interval (500 milliseconds)
-    root.after(500, check_date_for_salary_entry)
-
 #GUI Title
 
 title_label = tb.Label(root,text="Expense Tracker",font=("Poor Richard",38))
@@ -248,8 +228,6 @@ Salary_label.pack(pady=10)
 
 salary_Entry = tb.Entry(DB_Scrolled_frame)
 salary_Entry.pack(pady=10,ipadx=16)
-
-check_date_for_salary_entry()
 
 #income and expenditure labels,Entry,combobutton
 
