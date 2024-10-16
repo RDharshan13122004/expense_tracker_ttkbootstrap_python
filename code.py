@@ -70,8 +70,6 @@ class DB_work:
             if conn:
                 conn.close()
 
-        
-
     @classmethod
     def new_section_of_label(cls):
         
@@ -87,8 +85,8 @@ class DB_work:
         new_set_frame.pack(fill="x", pady=5)
         
         # Add 1st entry in the new row frame
-        Exp_amount_entry = tb.Entry(new_set_frame,bootstyle="success")
-        Exp_amount_entry.pack(pady=10,side="left",padx=5)
+        cls.Exp_amount_entry = tb.Entry(new_set_frame,bootstyle="success")
+        cls.Exp_amount_entry.pack(pady=10,side="left",padx=5)
 
         #creating expenditure category combobox
 
@@ -98,14 +96,15 @@ class DB_work:
             cls.items.add(val)
 
         # Add 2nd entry in the new row frame, on the same line
-        category_combobox = tb.Combobox(new_set_frame,bootstyle="success",values=sorted(list(cls.items)))
-        category_combobox.pack(side="left",pady=10,padx=5)
+        cls.category_combobox = tb.Combobox(new_set_frame,bootstyle="success",values=sorted(list(cls.items)))
+        cls.category_combobox.pack(side="left",pady=10,padx=5)
 
-        category_combobox.current(0)
+        cls.category_combobox.current(0)
 
         # Save references for later use
-        cls.entries.append(Exp_amount_entry)
-        cls.combos.append(category_combobox)
+        cls.entries.append(cls.Exp_amount_entry)
+        cls.combos.append(cls.category_combobox)
+
 
         conn.commit()
         conn.close()
@@ -130,38 +129,50 @@ class DB_work:
 
             print(amount)
             print(category)
+            
+            if category in cls.items:
+                #create a function which need to add record if the record already has a value
+                DB_work.update_data_table(category,amount)
+
+        for i in range(len(cls.entries)):
+            amount = cls.entries[i].get()
+            category = cls.combos[i].get()
+
             if category not in cls.items:
-                DB_work.category_pop(category)
+                DB_work.category_pop(category,amount)
 
         conn.commit()
         conn.close()
-
-    @classmethod
-    def category_pop(cls,caty):
         
-        cls.new_category_pop = tb.Toplevel(title="new category insert",size=(300,300))
+    @classmethod
+    def category_pop(cls,caty,amt):
+        
+        new_category_pop = tb.Toplevel(title="new category insert",size=(300,300))
 
         the_category = caty
+        amt_of_newcat = amt
         
-        new_category_entry = tb.Entry(cls.new_category_pop)
+        new_category_entry = tb.Entry(new_category_pop)
         new_category_entry.pack(pady=20)
         new_category_entry.insert(0,the_category)
 
         inc_or_exp = StringVar()
 
-        income_radio_btn = tb.Radiobutton(cls.new_category_pop,variable=inc_or_exp,value="income",bootstyle = "success",text="income")
+        income_radio_btn = tb.Radiobutton(new_category_pop,variable=inc_or_exp,value="income",bootstyle = "success",text="income")
         income_radio_btn.pack(pady=20)
 
-        expense_radio_btn = tb.Radiobutton(cls.new_category_pop,variable=inc_or_exp,value="expense",bootstyle = "danger",text="expense")
+        expense_radio_btn = tb.Radiobutton(new_category_pop,variable=inc_or_exp,value="expense",bootstyle = "danger",text="expense")
         expense_radio_btn.pack(pady=20)
 
-        cp_submit = tb.Button(cls.new_category_pop,bootstyle="success",text="ADD",command=lambda: DB_work.alt_tables(the_category,inc_or_exp.get()))
+        cp_submit = tb.Button(new_category_pop,bootstyle="success",text="ADD",command=lambda: DB_work.alt_tables(the_category,inc_or_exp.get(),amt_of_newcat,new_category_pop))
         cp_submit.pack(pady=20)
 
     @classmethod 
-    def alt_tables(cls,caty,value):
+    def alt_tables(cls,caty,value,amt,pop_window):
 
         caty_item = caty.replace(" ","_").strip().lower()
+
+        the_amount = amt
         
         conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
         query = conn.cursor()
@@ -170,10 +181,48 @@ class DB_work:
 
         query.execute(f"ALTER TABLE DATA ADD COLUMN {caty_item} REAL DEFAULT NULL")
 
+        query.execute(f"update DATA set {caty_item} = ? where entry_date = ?",(the_amount,Date_Entry.entry.get()))
+
         conn.commit()
         conn.close()
         
-        cls.new_category_pop.destroy()
+        pop_window.destroy()
+
+    @classmethod
+    def update_data_table(cls,caty,amt=0):
+        conn = None
+        try:
+            conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+            query = conn.cursor()
+
+            caty_item2 = caty.replace(" ", "_").strip().lower()
+
+            query.execute(f"SELECT {caty_item2} FROM DATA WHERE entry_date = ?", (Date_Entry.entry.get(),))
+            ck_1 = query.fetchone()
+
+            # If the category is None, insert the amount
+            if ck_1 is None or ck_1[0] is None:
+                query.execute(f"UPDATE DATA SET {caty_item2} = ? WHERE entry_date = ?", (amt, Date_Entry.entry.get()))
+            else:
+                existing_value = ck_1[0]
+
+                # Handle None or empty existing value
+                if not existing_value:
+                    existing_value = 0
+
+                # Safely add the new value
+                try:
+                    new_value = float(existing_value) + float(amt)
+                    query.execute(f"UPDATE DATA SET {caty_item2} = ? WHERE entry_date = ?", (new_value, Date_Entry.entry.get()))
+                except ValueError:
+                    print(f"Invalid data in database or input: {existing_value} or {amt}")
+
+            conn.commit()
+        except sqlite3.OperationalError as e:
+            print(f"SQLite error: {e}")
+        finally:
+            if conn:
+                conn.close()
 
 #functions
 
