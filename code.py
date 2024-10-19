@@ -24,6 +24,7 @@ class DB_work:
 
     entries = [] #stores all amount entries 
     combos = [] #store all combo boxes
+    dynamic_frames = []  # stores dynamically created frames
 
     def __init__(self):
         try:
@@ -53,6 +54,18 @@ class DB_work:
                         ITEMs TEXT PRIMARY KEY,
                         Inc_exp TEXT
                         )""")
+            
+            # Insert default items into Income_expenditure
+            default_items = [
+                ('addional_income', 'income'),
+                ('travel', 'expense'),
+                ('food', 'expense'),
+                ('regular_expense', 'expense')
+            ]
+
+            for item in default_items:
+                query.execute("INSERT OR IGNORE INTO Income_expenditure (ITEMs, Inc_exp) VALUES (?, ?)", item)
+
             conn.commit()
 
         except sqlite3.Error as e:
@@ -104,7 +117,7 @@ class DB_work:
         # Save references for later use
         cls.entries.append(cls.Exp_amount_entry)
         cls.combos.append(cls.category_combobox)
-
+        cls.dynamic_frames.append(new_set_frame)  # Add the frame to the dynamic_frames list
 
         conn.commit()
         conn.close()
@@ -132,7 +145,27 @@ class DB_work:
             
             if category in cls.items:
                 #create a function which need to add record if the record already has a value
-                DB_work.update_data_table(category,amount)
+                caty_item2 = category.replace(" ", "_").strip().lower() 
+
+                query.execute(f"SELECT {caty_item2} FROM DATA WHERE entry_date = ?", (Date_Entry.entry.get(),))
+                ck_1 = query.fetchone()
+
+                # If the category is None, insert the amount
+                if ck_1 is None or ck_1[0] is None:
+                    query.execute(f"UPDATE DATA SET {caty_item2} = ? WHERE entry_date = ?", (amount, Date_Entry.entry.get()))
+                else:
+                    existing_value = ck_1[0]
+
+                    # Handle None or empty existing value
+                    if not existing_value:
+                        existing_value = 0
+
+                    # Safely add the new value
+                    try:
+                        new_value = float(existing_value) + float(amount)
+                        query.execute(f"UPDATE DATA SET {caty_item2} = ? WHERE entry_date = ?", (new_value, Date_Entry.entry.get()))
+                    except ValueError:
+                        print(f"Invalid data in database or input: {existing_value} or {amount}")
 
         for i in range(len(cls.entries)):
             amount = cls.entries[i].get()
@@ -144,6 +177,14 @@ class DB_work:
         conn.commit()
         conn.close()
         
+        for frame in cls.dynamic_frames:
+            frame.destroy()
+
+        # Clear the lists after destroying the frames
+        cls.entries.clear()
+        cls.combos.clear()
+        cls.dynamic_frames.clear()
+
     @classmethod
     def category_pop(cls,caty,amt):
         
@@ -189,45 +230,78 @@ class DB_work:
         pop_window.destroy()
 
     @classmethod
-    def update_data_table(cls,caty,amt=0):
-        conn = None
+    def update_salary_for_month(cls,base_date):
+
         try:
+
             conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
             query = conn.cursor()
 
-            caty_item2 = caty.replace(" ", "_").strip().lower()
+            base_date_obj = datetime.strptime(base_date,"%d-%m-%Y").replace(day=1)
 
-            query.execute(f"SELECT {caty_item2} FROM DATA WHERE entry_date = ?", (Date_Entry.entry.get(),))
-            ck_1 = query.fetchone()
+            query.execute("""select * from DATA where strftime('%Y-%m', entry_date) = strftime('%Y-%m', ?)
+            """, (base_date_obj.strftime('%Y-%m-%d'),))
 
-            # If the category is None, insert the amount
-            if ck_1 is None or ck_1[0] is None:
-                query.execute(f"UPDATE DATA SET {caty_item2} = ? WHERE entry_date = ?", (amt, Date_Entry.entry.get()))
-            else:
-                existing_value = ck_1[0]
+            entries = query.fetchall()
 
-                # Handle None or empty existing value
-                if not existing_value:
-                    existing_value = 0
+            query.execute("PRAGMA table_info(DATA)")
+            columns = query.fetchall()
+            column_names = [col[2] for col in columns]
 
-                # Safely add the new value
-                try:
-                    new_value = float(existing_value) + float(amt)
-                    query.execute(f"UPDATE DATA SET {caty_item2} = ? WHERE entry_date = ?", (new_value, Date_Entry.entry.get()))
-                except ValueError:
-                    print(f"Invalid data in database or input: {existing_value} or {amt}")
+            income_columns = []
+            expense_columns = []
+
+            for col in column_names:
+                query.execute("SELECT Inc_exp FROM Income_expenditure WHERE ITEMs = ?", (col,))
+                inc_exp = query.fetchone()
+                if inc_exp:
+                    if inc_exp[0] == 'income':
+                        income_columns.append(col)
+                    elif inc_exp[0] == 'expense':
+                        expense_columns.append(col)
+
+            net_income = 0 
+            
+            if entries:
+                for entry in entries:
+                    e_date = entry[0]  # entry_date is the first column
+
+                    # Calculate total income dynamically
+                    total_income = sum([entry[columns.index(col)] or 0 for col in income_columns])
+
+                    # Calculate total expenses dynamically
+                    total_expenses = sum([entry[columns.index(col)] or 0 for col in expense_columns])
+
+                    # Calculate net income
+                    net_income = total_income - total_expenses
+
+                    query.execute("""
+                        UPDATE DATA
+                        SET salary = ?
+                        WHERE entry_date > ? AND strftime('%Y-%m', entry_date) = strftime('%Y-%m', ?)
+                        LIMIT 1
+                    """, (net_income, e_date, base_date_obj.strftime('%Y-%m-%d')))
+
+            # Update the salary entry in the GUI
+            salary_Entry.delete(0, END)  # Clear the current value in the salary entry
+            salary_Entry.insert(0, net_income)  # Insert the calculated net income
 
             conn.commit()
-        except sqlite3.OperationalError as e:
-            print(f"SQLite error: {e}")
+
+        except sqlite3.Error as e:
+            # Handle any database errors
+            print(f"Database error: {e}")
         finally:
             if conn:
                 conn.close()
-
 #functions
 
 def select_theme(x):
     root.style.theme_use(x)
+
+def on_date_selected():
+    selected_date = Date_Entry.entry.get()
+    DB_work.update_salary_for_month(selected_date)
 
 def upload_csv():
     CSV_frame.filename = filedialog.askopenfilename(initialdir="C:/users/",title="CSV files",filetypes=[("csv files","*csv")])
@@ -238,6 +312,21 @@ def upload_csv():
             reader = csv.reader(csvfile)
             for row in reader:
                 print(row)  # Example: Print each row in the CSV file
+
+def enable_disable_date(get_date):
+
+    selected_date = get_date.get()
+
+    if selected_date == "":
+        return
+
+    selected_date_obj = datetime.strptime(selected_date,"%d-%m-%Y")
+    
+    if selected_date_obj.day == 1:
+        salary_Entry.config(state="normal") 
+    else:
+        salary_Entry.config(state="disabled")
+
 
 #GUI Title
 
@@ -299,11 +388,14 @@ Date_label.pack(pady=10)
 Date_Entry = tb.DateEntry(DB_Scrolled_frame,firstweekday=6,bootstyle="info")
 Date_Entry.pack()
 
+date_get = StringVar()
+date_get.trace_add("write",lambda name, mode, value, get_date = date_get: enable_disable_date(get_date))
+Date_Entry.entry.config(textvariable=date_get)
+
 Salary_label = tb.Label(DB_Scrolled_frame,text="Salary:",font=('Helvertica',18))
 Salary_label.pack(pady=10)
 
-
-salary_Entry = tb.Entry(DB_Scrolled_frame)
+salary_Entry = tb.Entry(DB_Scrolled_frame,state="disabled")
 salary_Entry.pack(pady=10,ipadx=16)
 
 #income and expenditure labels,Entry,combobutton
@@ -314,13 +406,12 @@ category_label.pack(pady=20)
 
 #creating a main frame to hold multiple frames 
 main_ex_frame = tb.Frame(DB_Scrolled_frame)
-main_ex_frame.pack(pady=20)
+main_ex_frame.pack(pady=5)
 
 #1st frame in main frame and setting a frame to bring the amount entry and category menubutton on a same line
 set_frame = tb.Frame(main_ex_frame)
 set_frame.pack(fill="x", pady=5)
 
-DB_work.new_section_of_label()
 
 #add button to insert multiple income and expenditure labels,Entry,combobox
 
@@ -336,6 +427,31 @@ test1.pack()
 
 submit_button = tb.Button(DB_Scrolled_frame,text="Submit",bootstyle="success outline",command=DB_work.submit)
 submit_button.pack(pady=20)
+
+#separator
+
+my_sep = tb.Separator(DB_Scrolled_frame,bootstyle="light",orient="horizontal")
+my_sep.pack(fill="x",padx=40)
+
+#Data visualization section
+DV_title_label = tb.Label(DB_Scrolled_frame,text="Visualize your Expense",font=("Helvertica",22))
+DV_title_label.pack(pady=20)
+
+From_date = tb.Label(DB_Scrolled_frame,text="From :",font=("Helvertica", 18))
+From_date.pack(pady=10)
+
+From_date_entry = tb.DateEntry(DB_Scrolled_frame,firstweekday=6,bootstyle="warning")
+From_date_entry.pack(pady=10)
+
+
+to_date = tb.Label(DB_Scrolled_frame,text="To :",font=("Helvertica", 18))
+to_date.pack(pady=10)
+
+to_date_entry = tb.DateEntry(DB_Scrolled_frame,firstweekday=6,bootstyle="warning")
+to_date_entry.pack(pady=10)
+
+DV_submit_btn = tb.Button(DB_Scrolled_frame,text="View Data",bootstyle = "success")
+DV_submit_btn.pack(pady=20)
 
 #******************************************************************************************************************************#
 
