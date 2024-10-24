@@ -10,7 +10,6 @@ import csv
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-import datetime
 from datetime import datetime
 
 root = tb.Window(title="Expense Tracker",
@@ -44,7 +43,7 @@ class DB_work:
             query.execute("""create table IF NOT EXISTS DATA(
                         entry_date Date PRIMARY KEY,
                         salary REAL,
-                        addional_income REAL DEFAULT NULL,
+                        additional_income REAL DEFAULT NULL,
                         travel REAL DEFAULT NULL,
                         food REAL DEFAULT NULL,
                         regular_expense REAL DEFAULT NULL
@@ -54,10 +53,10 @@ class DB_work:
                         ITEMs TEXT PRIMARY KEY,
                         Inc_exp TEXT
                         )""")
-            
+
             # Insert default items into Income_expenditure
             default_items = [
-                ('addional_income', 'income'),
+                ('additional_income', 'income'),
                 ('travel', 'expense'),
                 ('food', 'expense'),
                 ('regular_expense', 'expense')
@@ -185,6 +184,9 @@ class DB_work:
         cls.combos.clear()
         cls.dynamic_frames.clear()
 
+        Date_Entry.entry.delete(0,END)
+        salary_Entry.delete(0,END)
+
     @classmethod
     def category_pop(cls,caty,amt):
         
@@ -228,7 +230,7 @@ class DB_work:
         conn.close()
         
         pop_window.destroy()
-
+'''
     @classmethod
     def update_salary_for_month(cls,base_date):
 
@@ -246,7 +248,7 @@ class DB_work:
 
             query.execute("PRAGMA table_info(DATA)")
             columns = query.fetchall()
-            column_names = [col[2] for col in columns]
+            column_names = [col[1] for col in columns]
 
             income_columns = []
             expense_columns = []
@@ -294,14 +296,11 @@ class DB_work:
         finally:
             if conn:
                 conn.close()
+'''
 #functions
 
 def select_theme(x):
     root.style.theme_use(x)
-
-def on_date_selected():
-    selected_date = Date_Entry.entry.get()
-    DB_work.update_salary_for_month(selected_date)
 
 def upload_csv():
     CSV_frame.filename = filedialog.askopenfilename(initialdir="C:/users/",title="CSV files",filetypes=[("csv files","*csv")])
@@ -326,6 +325,127 @@ def enable_disable_date(get_date):
         salary_Entry.config(state="normal") 
     else:
         salary_Entry.config(state="disabled")
+
+
+def dynamic_update_DB(get_date):
+    selected_date = get_date.get()  # Get the date from the user interface
+    
+    # Check if the date is empty
+    if not selected_date.strip():  # If selected_date is empty or only whitespace
+        print("No date selected")
+        return  # Exit the function early if no date is provided
+
+    try:
+        selected_date_obj = datetime.strptime(selected_date, "%d-%m-%Y")  # Convert to datetime object
+    except ValueError:
+        print("Invalid date format. Please provide a date in DD-MM-YYYY format.")
+        return  # Exit the function if the date format is incorrect
+
+    # Connect to the SQLite database
+    conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+    query = conn.cursor()
+
+    try:
+        # Fetch entries for the selected month and year
+        query.execute("""
+            SELECT * FROM DATA 
+            WHERE substr(entry_date, 4, 2) || '-' || substr(entry_date, 7, 4) = ? 
+            ORDER BY entry_date
+        """, (selected_date_obj.strftime('%m-%Y'),))
+        entries = query.fetchall()
+
+        # Get column names from the DATA table
+        query.execute("PRAGMA table_info(DATA)")
+        columns = query.fetchall()
+        column_names = [col[1] for col in columns]  # Fetch the column names
+
+        print(column_names)
+
+        # Fetch income and expense categories efficiently in one query
+        query.execute("SELECT ITEMs, Inc_exp FROM Income_expenditure")
+        inc_exp_data = query.fetchall()
+
+        # Separate income and expense columns
+        income_columns = [item[0] for item in inc_exp_data if item[1] == 'income']
+        expense_columns = [item[0] for item in inc_exp_data if item[1] == 'expense']
+
+        print("Income Columns:", income_columns)
+        print("Expense Columns:", expense_columns)
+
+        if entries:
+            for i, entry in enumerate(entries):
+                e_date = entry[0]  # First column is 'entry_date'
+                d_salary = entry[1]  # Second column is 'salary'
+
+                # Handle missing or empty salary
+                d_salary = float(d_salary or 0)  # Convert to float for calculation
+
+                print("Entry Date:", e_date)
+                print("Salary:", d_salary)
+
+                # Calculate total income dynamically including salary
+                total_income = sum([entry[column_names.index(col)] or 0 for col in income_columns]) + d_salary
+
+                # Calculate total expenses dynamically
+                total_expense = sum([entry[column_names.index(col)] or 0 for col in expense_columns])
+
+                print("Total Income:", total_income)
+                print("Total Expense:", total_expense)
+
+                # Calculate net income
+                net_income = total_income - total_expense
+                print("Net Income:", net_income)
+
+                if i + 1 < len(entries):
+                    next_entry_date = entries[i + 1][0]
+                    # Update the salary of the next entry to be the current net income
+                    query.execute("""
+                        UPDATE DATA
+                        SET salary = ?
+                        WHERE entry_date = ?
+                    """, (net_income, next_entry_date))
+                    print(f"Updated next entry's salary for date {next_entry_date} to {net_income}")
+        
+        query.execute("SELECT salary FROM DATA WHERE entry_date = ?", (selected_date,))
+        current_salary = query.fetchone()
+
+        if current_salary and current_salary[0] is not None:
+            # Salary exists for the selected date, use it
+            current_salary = float(current_salary[0])
+            print(f"Salary for {selected_date} is {current_salary}")
+        else:
+            # No salary for the selected date, retrieve the latest previous salary
+            query.execute("""
+                SELECT salary FROM DATA
+                WHERE entry_date < ? AND salary IS NOT NULL
+                ORDER BY entry_date DESC
+                LIMIT 1
+            """, (selected_date,))
+            previous_salary = query.fetchone()
+
+            if previous_salary and previous_salary[0] is not None:
+                # Use the previous salary
+                current_salary = float(previous_salary[0])
+                print(f"No salary for {selected_date}, using previous salary: {current_salary}")
+            else:
+                # No previous salary found, set to 0
+                current_salary = 0
+                print(f"No salary for {selected_date} and no previous salary found, setting salary to 0.")
+        # Commit changes (if any) and close the connection
+        conn.commit()
+
+        salary_Entry.config(state="normal")
+
+        # Clear and insert salary into the salary entry widget
+        salary_Entry.delete(0, 'end')  # Clear the entry field first
+        salary_Entry.insert(0, str(current_salary))  # Insert the salary as a string
+
+    except sqlite3.Error as e:
+        # Handle any SQLite errors
+        print(f"Database error: {e}")
+
+    finally:
+        conn.close()  # Ensure the database is always closed
 
 
 #GUI Title
@@ -390,6 +510,7 @@ Date_Entry.pack()
 
 date_get = StringVar()
 date_get.trace_add("write",lambda name, mode, value, get_date = date_get: enable_disable_date(get_date))
+date_get.trace_add("write",lambda name, mode, value, get_date = date_get: dynamic_update_DB(get_date))
 Date_Entry.entry.config(textvariable=date_get)
 
 Salary_label = tb.Label(DB_Scrolled_frame,text="Salary:",font=('Helvertica',18))
