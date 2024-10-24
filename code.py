@@ -231,7 +231,7 @@ class DB_work:
         
         pop_window.destroy()
 
-#functions
+#function sections
 
 def select_theme(x):
     root.style.theme_use(x)
