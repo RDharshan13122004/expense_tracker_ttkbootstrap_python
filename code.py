@@ -230,73 +230,7 @@ class DB_work:
         conn.close()
         
         pop_window.destroy()
-'''
-    @classmethod
-    def update_salary_for_month(cls,base_date):
 
-        try:
-
-            conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
-            query = conn.cursor()
-
-            base_date_obj = datetime.strptime(base_date,"%d-%m-%Y").replace(day=1)
-
-            query.execute("""select * from DATA where strftime('%Y-%m', entry_date) = strftime('%Y-%m', ?)
-            """, (base_date_obj.strftime('%Y-%m-%d'),))
-
-            entries = query.fetchall()
-
-            query.execute("PRAGMA table_info(DATA)")
-            columns = query.fetchall()
-            column_names = [col[1] for col in columns]
-
-            income_columns = []
-            expense_columns = []
-
-            for col in column_names:
-                query.execute("SELECT Inc_exp FROM Income_expenditure WHERE ITEMs = ?", (col,))
-                inc_exp = query.fetchone()
-                if inc_exp:
-                    if inc_exp[0] == 'income':
-                        income_columns.append(col)
-                    elif inc_exp[0] == 'expense':
-                        expense_columns.append(col)
-
-            net_income = 0 
-            
-            if entries:
-                for entry in entries:
-                    e_date = entry[0]  # entry_date is the first column
-
-                    # Calculate total income dynamically
-                    total_income = sum([entry[columns.index(col)] or 0 for col in income_columns])
-
-                    # Calculate total expenses dynamically
-                    total_expenses = sum([entry[columns.index(col)] or 0 for col in expense_columns])
-
-                    # Calculate net income
-                    net_income = total_income - total_expenses
-
-                    query.execute("""
-                        UPDATE DATA
-                        SET salary = ?
-                        WHERE entry_date > ? AND strftime('%Y-%m', entry_date) = strftime('%Y-%m', ?)
-                        LIMIT 1
-                    """, (net_income, e_date, base_date_obj.strftime('%Y-%m-%d')))
-
-            # Update the salary entry in the GUI
-            salary_Entry.delete(0, END)  # Clear the current value in the salary entry
-            salary_Entry.insert(0, net_income)  # Insert the calculated net income
-
-            conn.commit()
-
-        except sqlite3.Error as e:
-            # Handle any database errors
-            print(f"Database error: {e}")
-        finally:
-            if conn:
-                conn.close()
-'''
 #functions
 
 def select_theme(x):
