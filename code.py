@@ -8,7 +8,7 @@ from ttkbootstrap.toast import ToastNotification
 import sqlite3
 import csv
 import os
-import numpy as np
+from openpyxl import Workbook
 import matplotlib.pyplot as plt
 from datetime import datetime
 
@@ -231,7 +231,7 @@ class DB_work:
         
         pop_window.destroy()
 
-#function sections
+#functions
 
 def select_theme(x):
     root.style.theme_use(x)
@@ -245,6 +245,82 @@ def upload_csv():
             reader = csv.reader(csvfile)
             for row in reader:
                 print(row)  # Example: Print each row in the CSV file
+
+def download_xl():
+
+    try:
+
+        current_time = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+
+        #print(current_time)
+
+        default_path = os.path.join(os.path.expanduser("~"),"Downloads")
+
+        file_name = f"EXPENSE_Tracker_{current_time}.xlsx"
+
+        file_path = os.path.join(default_path,file_name)
+
+        wb = Workbook()
+
+        ws1 =  wb.create_sheet(title="DATA",index=0)
+
+        ws2 = wb.create_sheet(title="Income expenditure",index=1)
+
+        conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+        query = conn.cursor()
+        
+        query.execute("PRAGMA table_info(DATA)")
+        data_table_col = query.fetchall()
+
+        ws1.append([dtr[1] for dtr in data_table_col])
+
+        query.execute("""
+            SELECT * FROM DATA
+            ORDER BY substr(entry_date, 7, 4) ASC,  -- Year
+                    substr(entry_date, 4, 2) ASC,  -- Month
+                    substr(entry_date, 1, 2) ASC;  -- Day
+        """)
+        data = query.fetchall()
+
+        for row in data:
+            ws1.append(list(row))
+
+        query.execute("PRAGMA table_info(Income_expenditure)")
+        IE_table_col = query.fetchall()
+
+        ws2.append([row[1] for row in IE_table_col])    
+            
+
+        query.execute("select * from Income_expenditure order by ITEMs")
+        ie_data = query.fetchall()
+        
+        for row in ie_data:
+            ws2.append(list(row))
+
+        conn.commit()
+
+        Success_toast = ToastNotification(title="Expense tracker notification",
+                                      message=f"the excel file successfully downloaded in documents",
+                                      duration=3000,
+                                      bootstyle="success",
+                                      alert=True,
+                                      ) 
+        Success_toast.show_toast()
+    except Exception as e:
+        toast = ToastNotification(title="Expense tracker warning message ⚠️",
+                                      message=f"An error occurred while downloading excel file: {e}",
+                                      duration=3000,
+                                      bootstyle="warning",
+                                      alert=True,
+                                      ) 
+        toast.show_toast()
+        
+    finally:
+        if conn:
+            conn.close()
+
+    wb.save(file_path)
+
 
 def enable_disable_date(get_date):
 
@@ -518,7 +594,7 @@ upload_csv_btn.pack(pady=20)
 #****************************************************************************************************************************#
 #XL_Frame Section
 
-export_xl_btn = tb.Button(XL_frame,bootstyle="success outline",text="Export Excel")
+export_xl_btn = tb.Button(XL_frame,bootstyle="success outline",text="Export Excel",command=download_xl)
 export_xl_btn.pack(pady=20)
 
 #*****************************************************************************************************************************#
