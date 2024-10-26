@@ -5,12 +5,15 @@ from tkinter import filedialog
 import ttkbootstrap as tb
 from ttkbootstrap.scrolled import ScrolledFrame
 from ttkbootstrap.toast import ToastNotification
+from ttkbootstrap.dialogs import Messagebox
 import sqlite3
 import csv
 import os
 from openpyxl import Workbook
 import matplotlib.pyplot as plt
 from datetime import datetime
+from collections import defaultdict
+
 
 root = tb.Window(title="Expense Tracker",
                  themename="superhero",
@@ -237,14 +240,55 @@ def select_theme(x):
     root.style.theme_use(x)
 
 def upload_csv():
-    CSV_frame.filename = filedialog.askopenfilename(initialdir="C:/users/",title="CSV files",filetypes=[("csv files","*csv")])
-    if CSV_frame.filename:  # Check if a file was selected
-        # Now you can handle the CSV file as needed
-        with open(CSV_frame.filename, newline='') as csvfile:
-            # Process the CSV content here, e.g., using the csv module
-            reader = csv.reader(csvfile)
-            for row in reader:
-                print(row)  # Example: Print each row in the CSV file
+    try:
+        CSV_frame.filename = filedialog.askopenfilename(initialdir="C:/users/", title="CSV files", filetypes=[("csv files", "*csv")])
+        if CSV_frame.filename:  # Check if a file was selected
+            # Dictionary to hold data grouped by expense category
+            expense_data = defaultdict(list)
+            
+            # Open the CSV file and read data
+            with open(CSV_frame.filename, newline='', encoding='utf-8-sig') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    # Parse the date (format: MM/DD/YY)
+                    parsed_date = datetime.strptime(row['Date'], "%m/%d/%y")
+                    amount = float(row['Debit'])  # Convert 'Debit' to float
+                    expense = row['Expense']  # Category of expense
+                    expense_data[expense].append((parsed_date, amount))
+
+            # Aggregate total expenses by category for the pie chart
+            category_totals = {expense: sum(amount for _, amount in data) for expense, data in expense_data.items()}
+
+            # Create subplots: 1 row, 2 columns
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
+            # Multiline Plot (Left)
+            for expense, data in expense_data.items():
+                # Sort data by date for each category
+                data.sort()
+                dates, amounts = zip(*data)  # Unpack dates and amounts
+                ax1.plot(dates, amounts, marker='o', label=expense)  # Plot each category
+
+            # Format multiline plot
+            ax1.set_xlabel("Date")
+            ax1.set_ylabel("Amount")
+            ax1.set_title("Expenses over Time by Category")
+            ax1.tick_params(axis='x', rotation=45)
+            ax1.legend(title="Expense Category", bbox_to_anchor=(1.05, 1), loc='upper left')  # Position legend outside plot
+
+            # Pie Chart (Right)
+            ax2.pie(category_totals.values(), labels=category_totals.keys(), autopct='%1.1f%%', startangle=140)
+            ax2.set_title("Total Expense Distribution by Category")
+
+            # Adjust layout to prevent overlap
+            plt.tight_layout()
+            plt.show()
+
+    except Exception  as e :
+
+        Messagebox.show_warning(title="Expense Tracker",message="There is a problem with in the file",alert=True)
+            
+
 
 def download_xl():
 
