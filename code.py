@@ -561,40 +561,6 @@ def dynamic_update_DB(get_date):
                     """, (net_income, next_entry_date))
                     print(f"Updated next entry's salary for date {next_entry_date} to {net_income}")
         
-        query.execute("SELECT salary FROM DATA WHERE entry_date = ?", (selected_date,))
-        current_salary = query.fetchone()
-
-        if current_salary and current_salary[0] is not None:
-            # Salary exists for the selected date, use it
-            current_salary = float(current_salary[0])
-            print(f"Salary for {selected_date} is {current_salary}")
-        else:
-            # No salary for the selected date, retrieve the latest previous salary
-            query.execute("""
-                SELECT salary FROM DATA
-                WHERE entry_date < ? AND salary IS NOT NULL
-                ORDER BY entry_date DESC
-                LIMIT 1
-            """, (selected_date,))
-            previous_salary = query.fetchone()
-
-            if previous_salary and previous_salary[0] is not None:
-                # Use the previous salary
-                current_salary = float(previous_salary[0])
-                print(f"No salary for {selected_date}, using previous salary: {current_salary}")
-            else:
-                # No previous salary found, set to 0
-                current_salary = 0
-                print(f"No salary for {selected_date} and no previous salary found, setting salary to 0.")
-        # Commit changes (if any) and close the connection
-        conn.commit()
-
-        salary_Entry.config(state="normal")
-
-        # Clear and insert salary into the salary entry widget
-        salary_Entry.delete(0, 'end')  # Clear the entry field first
-        salary_Entry.insert(0, str(current_salary))  # Insert the salary as a string
-
     except sqlite3.Error as e:
         # Handle any SQLite errors
         print(f"Database error: {e}")
