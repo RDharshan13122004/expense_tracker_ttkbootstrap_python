@@ -239,6 +239,107 @@ class DB_work:
 def select_theme(x):
     root.style.theme_use(x)
 
+def get_DB_chart(fdate,tdate):
+
+    conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+    query = conn.cursor()
+
+    if fdate == tdate:
+
+        query.execute("select * from DATA where entry_date = ?",(fdate,))
+        fetch_data = query.fetchall()
+
+        if not fetch_data:
+            toaster = ToastNotification(title="Expense Tracker notification",
+                                        message=f"There is no data to fetch on {fdate}",
+                                        duration=3000,
+                                        alert=True,
+                                        bootstyle="warning")
+            
+            toaster.show_toast()
+        else:
+
+            #print(fetch_data)
+            query.execute("PRAGMA table_info(DATA)")
+            column = query.fetchall()
+            
+            category = [col[1] for col in column if col[1] not in ["entry_date","salary"]]
+
+            query.execute(f"select "+", ".join(category)+" from DATA where entry_date = ?",(fdate,))
+            amounts = query.fetchone()
+            print(category)
+            print(amounts)
+
+            # Filter out None values
+            filtered_categories = []
+            filtered_amounts = []
+            for cat, amt in zip(category, amounts):
+                if amt is not None:
+                    filtered_categories.append(cat)
+                    filtered_amounts.append(amt)
+
+            if amounts:
+                plt.bar(filtered_categories, filtered_amounts)
+                plt.xlabel("Category")
+                plt.ylabel("Amount")
+                plt.title(f"Expense Data for {fdate}")
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                plt.show()
+    
+    if fdate != tdate:
+
+        query.execute("""
+            SELECT * FROM DATA
+            WHERE entry_date BETWEEN ? AND ?
+            ORDER BY substr(entry_date, 7, 4) ASC,  -- Year
+                    substr(entry_date, 4, 2) ASC,  -- Month
+                    substr(entry_date, 1, 2) ASC;  -- Day
+        """, (fdate, tdate))
+        fetch_data = query.fetchall()
+
+        print(fetch_data)
+
+        if not fetch_data:
+            print(f"No data available between {fdate} and {tdate}.")
+            return
+
+        # Prepare data for multiline chart
+        dates = [datetime.strptime(row[0], "%d-%m-%Y") for row in fetch_data]
+        categories = [col[1] for col in query.execute("PRAGMA table_info(DATA)").fetchall() if col[1] not in ["entry_date", "salary"]]
+        category_data = {category: [] for category in categories}
+
+        # Populate category_data with amounts, replace None with 0
+        for row in fetch_data:
+            for idx, category in enumerate(categories, start=1):
+                category_data[category].append(row[idx] if row[idx] is not None else 0)
+
+        # Multiline chart for each category over dates
+        plt.figure(figsize=(10, 6))
+        for category, amounts in category_data.items():
+            plt.plot(dates, amounts, label=category)
+        plt.xlabel("Date")
+        plt.ylabel("Amount")
+        plt.title(f"Expense Trends from {fdate} to {tdate}")
+        plt.xticks(rotation=45)
+        plt.legend(title="Categories")
+        plt.tight_layout()
+        plt.show()
+
+        # Pie chart for total amounts per category in date range
+        total_amounts = [sum(amounts) for amounts in category_data.values()]
+        filtered_totals = [amt for amt in total_amounts if amt > 0]  # Exclude categories with zero sum
+        filtered_categories = [category for category, amt in zip(categories, total_amounts) if amt > 0]
+
+        if filtered_totals:
+            plt.figure(figsize=(8, 8))
+            plt.pie(filtered_totals, labels=filtered_categories, autopct='%1.1f%%', startangle=140)
+            plt.title(f"Category Breakdown from {fdate} to {tdate}")
+            plt.show()
+
+    conn.commit()
+    conn.close()
+
 def upload_csv():
     try:
         CSV_frame.filename = filedialog.askopenfilename(initialdir="C:/users/", title="CSV files", filetypes=[("csv files", "*csv")])
@@ -625,7 +726,7 @@ to_date.pack(pady=10)
 to_date_entry = tb.DateEntry(DB_Scrolled_frame,firstweekday=6,bootstyle="warning")
 to_date_entry.pack(pady=10)
 
-DV_submit_btn = tb.Button(DB_Scrolled_frame,text="View Data",bootstyle = "success")
+DV_submit_btn = tb.Button(DB_Scrolled_frame,text="View Data",bootstyle = "success",command= lambda:get_DB_chart(From_date_entry.entry.get(),to_date_entry.entry.get()))
 DV_submit_btn.pack(pady=20)
 
 #******************************************************************************************************************************#
