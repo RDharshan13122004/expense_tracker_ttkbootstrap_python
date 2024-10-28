@@ -1,7 +1,6 @@
 
 from tkinter import *
 from tkinter import filedialog
-#from tkinter import font
 import ttkbootstrap as tb
 from ttkbootstrap.scrolled import ScrolledFrame
 from ttkbootstrap.toast import ToastNotification
@@ -30,16 +29,21 @@ class DB_work:
 
     def __init__(self):
         try:
-            '''
+            
             # Get the path to the user's Documents folder
-            document_path = os.path.join(os.path.expanduser("~"),"Documents")
+            document_path = os.path.join(os.path.expanduser("~"),"Downloads")
 
             # Specify the database location in the Documents folder
             db_path = os.path.join(document_path,"exptracker.db")
             conn = sqlite3.connect(db_path)
-            '''
+            
             #connecting DB
-            conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+            ## Get the path to the user's Documents folder
+            document_path = os.path.join(os.path.expanduser("~"),"Downloads")
+
+            # Specify the database location in the Documents folder
+            db_path = os.path.join(document_path,"exptracker.db")
+            conn = sqlite3.connect(db_path)
             query = conn.cursor()
 
             #Create tables if they don't exist
@@ -89,7 +93,12 @@ class DB_work:
     def new_section_of_label(cls):
         
         #connecting DB
-        conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+        # Get the path to the user's Documents folder
+        document_path = os.path.join(os.path.expanduser("~"),"Downloads")
+
+        # Specify the database location in the Documents folder
+        db_path = os.path.join(document_path,"exptracker.db")
+        conn = sqlite3.connect(db_path)
         query = conn.cursor()
 
         query.execute("select ITEMs from Income_expenditure")
@@ -126,8 +135,14 @@ class DB_work:
 
 
     @classmethod
-    def submit(cls):
-        conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+    def submit(cls):    
+
+        # Get the path to the user's Documents folder
+        document_path = os.path.join(os.path.expanduser("~"),"Downloads")
+
+            # Specify the database location in the Documents folder
+        db_path = os.path.join(document_path,"exptracker.db")
+        conn = sqlite3.connect(db_path)
         query =  conn.cursor()
 
         query.execute("select * from DATA where entry_date = ?",(Date_Entry.entry.get(),))
@@ -220,7 +235,12 @@ class DB_work:
 
         the_amount = amt
         
-        conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+        # Get the path to the user's Documents folder
+        document_path = os.path.join(os.path.expanduser("~"),"Downloads")
+
+            # Specify the database location in the Documents folder
+        db_path = os.path.join(document_path,"exptracker.db")
+        conn = sqlite3.connect(db_path)
         query = conn.cursor()
 
         query.execute("insert into Income_expenditure values (?,?)",(caty_item,value))
@@ -239,9 +259,15 @@ class DB_work:
 def select_theme(x):
     root.style.theme_use(x)
 
+
 def get_DB_chart(fdate,tdate):
 
-    conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+    # Get the path to the user's Documents folder
+    document_path = os.path.join(os.path.expanduser("~"),"Downloads")
+
+    # Specify the database location in the Documents folder
+    db_path = os.path.join(document_path,"exptracker.db")
+    conn = sqlite3.connect(db_path)
     query = conn.cursor()
 
     if fdate == tdate:
@@ -288,13 +314,13 @@ def get_DB_chart(fdate,tdate):
                 plt.show()
     
     if fdate != tdate:
-
+        # Fetch data between the two dates
         query.execute("""
             SELECT * FROM DATA
             WHERE entry_date BETWEEN ? AND ?
             ORDER BY substr(entry_date, 7, 4) ASC,  -- Year
-                    substr(entry_date, 4, 2) ASC,  -- Month
-                    substr(entry_date, 1, 2) ASC;  -- Day
+                     substr(entry_date, 4, 2) ASC,  -- Month
+                     substr(entry_date, 1, 2) ASC;  -- Day
         """, (fdate, tdate))
         fetch_data = query.fetchall()
 
@@ -306,7 +332,11 @@ def get_DB_chart(fdate,tdate):
 
         # Prepare data for multiline chart
         dates = [datetime.strptime(row[0], "%d-%m-%Y") for row in fetch_data]
-        categories = [col[1] for col in query.execute("PRAGMA table_info(DATA)").fetchall() if col[1] not in ["entry_date", "salary"]]
+        
+        # Get column names excluding entry_date and salary
+        query.execute("PRAGMA table_info(DATA)")
+        categories = [col[1] for col in query.fetchall() if col[1] not in ["entry_date", "salary"]]
+        
         category_data = {category: [] for category in categories}
 
         # Populate category_data with amounts, replace None with 0
@@ -317,7 +347,7 @@ def get_DB_chart(fdate,tdate):
         # Multiline chart for each category over dates
         plt.figure(figsize=(10, 6))
         for category, amounts in category_data.items():
-            plt.plot(dates, amounts, label=category)
+            plt.plot(dates, amounts, marker='o', label=category)
         plt.xlabel("Date")
         plt.ylabel("Amount")
         plt.title(f"Expense Trends from {fdate} to {tdate}")
@@ -411,7 +441,12 @@ def download_xl():
 
         ws2 = wb.create_sheet(title="Income expenditure",index=1)
 
-        conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+        # Get the path to the user's Documents folder
+        document_path = os.path.join(os.path.expanduser("~"),"Downloads")
+
+        # Specify the database location in the Documents folder
+        db_path = os.path.join(document_path,"exptracker.db")
+        conn = sqlite3.connect(db_path)
         query = conn.cursor()
         
         query.execute("PRAGMA table_info(DATA)")
@@ -481,23 +516,23 @@ def enable_disable_date(get_date):
     else:
         salary_Entry.config(state="disabled")
 
-
 def dynamic_update_DB(get_date):
     selected_date = get_date.get()  # Get the date from the user interface
     
     # Check if the date is empty
-    if not selected_date.strip():  # If selected_date is empty or only whitespace
+    if not selected_date.strip():
         print("No date selected")
-        return  # Exit the function early if no date is provided
+        return
 
     try:
-        selected_date_obj = datetime.strptime(selected_date, "%d-%m-%Y")  # Convert to datetime object
+        selected_date_obj = datetime.strptime(selected_date, "%d-%m-%Y")
     except ValueError:
         print("Invalid date format. Please provide a date in DD-MM-YYYY format.")
-        return  # Exit the function if the date format is incorrect
+        return
 
-    # Connect to the SQLite database
-    conn = sqlite3.connect("C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/exptracker.db")
+    document_path = os.path.join(os.path.expanduser("~"), "Downloads")
+    db_path = os.path.join(document_path, "exptracker.db")
+    conn = sqlite3.connect(db_path)
     query = conn.cursor()
 
     try:
@@ -512,11 +547,8 @@ def dynamic_update_DB(get_date):
         # Get column names from the DATA table
         query.execute("PRAGMA table_info(DATA)")
         columns = query.fetchall()
-        column_names = [col[1] for col in columns]  # Fetch the column names
+        column_names = [col[1] for col in columns]
 
-        print(column_names)
-
-        # Fetch income and expense categories efficiently in one query
         query.execute("SELECT ITEMs, Inc_exp FROM Income_expenditure")
         inc_exp_data = query.fetchall()
 
@@ -524,49 +556,33 @@ def dynamic_update_DB(get_date):
         income_columns = [item[0] for item in inc_exp_data if item[1] == 'income']
         expense_columns = [item[0] for item in inc_exp_data if item[1] == 'expense']
 
-        print("Income Columns:", income_columns)
-        print("Expense Columns:", expense_columns)
-
         if entries:
             for i, entry in enumerate(entries):
-                e_date = entry[0]  # First column is 'entry_date'
-                d_salary = entry[1]  # Second column is 'salary'
+                e_date = entry[0]
+                d_salary = entry[1] if entry[1] is not None else 0.0
 
-                # Handle missing or empty salary
-                d_salary = float(d_salary or 0)  # Convert to float for calculation
+                total_income = sum([float(entry[column_names.index(col)] or 0) for col in income_columns if col in column_names]) + float(d_salary or 0)
+                total_expense = sum([float(entry[column_names.index(col)] or 0) for col in expense_columns if col in column_names])
 
-                print("Entry Date:", e_date)
-                print("Salary:", d_salary)
 
-                # Calculate total income dynamically including salary
-                total_income = sum([entry[column_names.index(col)] or 0 for col in income_columns]) + d_salary
-
-                # Calculate total expenses dynamically
-                total_expense = sum([entry[column_names.index(col)] or 0 for col in expense_columns])
-
-                print("Total Income:", total_income)
-                print("Total Expense:", total_expense)
-
-                # Calculate net income
                 net_income = total_income - total_expense
-                print("Net Income:", net_income)
+                print(f"Entry Date: {e_date}, Salary: {d_salary}, Total Income: {total_income}, Total Expense: {total_expense}, Net Income: {net_income}")
 
+                # Update the salary of the next entry within the same month
                 if i + 1 < len(entries):
                     next_entry_date = entries[i + 1][0]
-                    # Update the salary of the next entry to be the current net income
                     query.execute("""
                         UPDATE DATA
                         SET salary = ?
                         WHERE entry_date = ?
                     """, (net_income, next_entry_date))
                     print(f"Updated next entry's salary for date {next_entry_date} to {net_income}")
-        
-    except sqlite3.Error as e:
-        # Handle any SQLite errors
-        print(f"Database error: {e}")
 
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
     finally:
-        conn.close()  # Ensure the database is always closed
+        conn.commit()  # Ensure all changes are saved
+        conn.close()
 
 
 #GUI Title
@@ -594,12 +610,6 @@ for theme in ["cosmo","flatly","litera","minty","lumen","yeti","pulse","united",
     select_menu.add_radiobutton(label=theme,variable=theme_var,command= lambda x = theme: select_theme(x))
 
 theme_menu["menu"] = select_menu
-
-#to get the font families
-"""
-font_fam = list(font.families()) 
-print(font_fam)
-"""
 
 #creating a notebook
 
@@ -659,11 +669,6 @@ set_frame.pack(fill="x", pady=5)
 
 exp_add_button = tb.Button(DB_Scrolled_frame,text="+",bootstyle = "info",command=DB_work.new_section_of_label)
 exp_add_button.pack()
-
-'''
-test1 = tb.Label(DB_Scrolled_frame,bootstyle="warning")
-test1.pack()
-'''
 
 #submit buttons
 
