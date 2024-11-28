@@ -29,6 +29,16 @@ An **Expense Tracker** application that allows users to track income and expense
    python code.py
    ```
 
+## **APP Installation & Setup**
+
+1. **Download the Executable:**
+   - Download `code.exe` from the provided link or folder.
+
+2. **Run the Application:**
+   - Simply double-click `code.exe` to launch the application.
+   - No installation or setup required on your system.
+   - The app will create and store the SQLite database file (`expenses.db`) in the same directory as the executable, if it doesn’t already exist.
+
 ## Usage
 
 1. **Launch the Application**: Upon launching, the main GUI will load, displaying options for entering income and expenses.
