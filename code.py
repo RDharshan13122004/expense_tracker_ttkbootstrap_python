@@ -16,7 +16,7 @@ from collections import defaultdict
 
 root = tb.Window(title="Expense Tracker",
                  themename="superhero",
-                 iconphoto="C:/Users/dharshan/Desktop/lang and tools/pyvsc/exp_tracker/image/84b81735b361bd85ac4cfef337c88308-removebg-preview.png",
+                 iconphoto="image/84b81735b361bd85ac4cfef337c88308-removebg-preview.png",
                  size=(600,600))
 
 #classes
